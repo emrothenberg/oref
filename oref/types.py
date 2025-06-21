@@ -1,6 +1,78 @@
 from typing import List, Literal, Sequence
 import logging
 
+from typing import Optional, List
+
+
+class AlertTranslation:
+    he: str
+    en: str
+    ru: str
+    ar: str
+    all_descs: List[str]
+    cat_id: int
+    matrix_cat_id: int
+    he_title: Optional[str]
+    en_title: Optional[str]
+    ru_title: Optional[str]
+    ar_title: Optional[str]
+    all_titles: List[Optional[str]]
+    update_type: int
+
+    def __init__(
+        self,
+        heb: str,
+        eng: str,
+        rus: str,
+        arb: str,
+        cat_id: int,
+        matrix_cat_id: int,
+        heb_title: Optional[str],
+        eng_title: Optional[str],
+        rus_title: Optional[str],
+        arb_title: Optional[str],
+        update_type: int
+    ):
+        self.he = heb
+        self.en = eng
+        self.ru = rus
+        self.ar = arb
+        self.all_descs = [heb, eng, rus, arb]
+        self.cat_id = cat_id
+        self.matrix_cat_id = matrix_cat_id
+        self.he_title = heb_title
+        self.en_title = eng_title
+        self.ru_title = rus_title
+        self.ar_title = arb_title
+        self.all_titles = [heb_title, eng_title, rus_title, arb_title]
+        self.update_type = update_type
+        
+    def __getitem__(self, key):
+        return getattr(self, f"{key}")
+
+    def __repr__(self):
+        return f"<Alert eng_title='{self.en_title}' cat_id={self.cat_id}>"
+
+
+def parse_alerts(data: List[dict]) -> List[AlertTranslation]:
+    return [
+        AlertTranslation(
+            heb=item["heb"],
+            eng=item["eng"],
+            rus=item["rus"],
+            arb=item["arb"],
+            cat_id=item["catId"],
+            matrix_cat_id=item["matrixCatId"],
+            heb_title=item.get("hebTitle"),
+            eng_title=item.get("engTitle"),
+            rus_title=item.get("rusTitle"),
+            arb_title=item.get("arbTitle"),
+            update_type=0 if item["updateType"] == "-" else int(
+                item["updateType"])
+        )
+        for item in data
+    ]
+
 
 class Placename:
     en: str
@@ -77,7 +149,7 @@ class Alert():
     unfiltered_locations: List[Location]
 
     def __init__(self, id: str, category: int, title: str, description: str, data: List[str], relevant: Sequence[str | int] | None = None, **kwargs):
-        from .loader import get_location
+        from .loader import location
         self.id = id
         self.category = category
         self.title = title
@@ -86,7 +158,7 @@ class Alert():
         self.locations = []
 
         for i in data:
-            loc = get_location(i)
+            loc = location(i)
             if isinstance(loc, Location):
                 self.unfiltered_locations.append(loc)
 
@@ -94,7 +166,7 @@ class Alert():
             self.filter_locations(relevant)
 
     def filter_locations(self, relevant: Sequence[int | str] | Literal["all"]) -> List[Location]:
-        from .loader import get_location, validate_location
+        from .loader import location, validate_location
         """
         Filters and returns a list of valid locations from the given identifiers.
 
@@ -115,14 +187,14 @@ class Alert():
 
         filtered = self.locations if relevant == "all" else []
 
-        if not self.locations == "all":
+        if not relevant == "all":
             for i in list(set(relevant)):
                 try:
                     validate_location(i)
                 except AssertionError:
                     logger.warning(f"Warning: [!] Location {i} is invalid.")
 
-                loc = get_location(i)
+                loc = location(i)
                 if loc and loc in self.unfiltered_locations:
                     filtered.append(loc)
 
